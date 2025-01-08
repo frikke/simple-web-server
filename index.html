@@ -5,7 +5,6 @@
         <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline'">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <link rel="stylesheet" href="style.css">
-        <script type='application/javascript' charset="utf-8" src='lang.js'></script>
     </head>
     <body style="visibility: hidden;" ondragenter="dragEnter(event)" ondragover="dragOver(event)" ondragleave="dragLeave(event)" ondrop="dragDrop(event)">
 
@@ -39,7 +38,7 @@
             <div style="padding-top: 8px;"></div>
 
             <div class="input_option">
-                <div class="label">{lang.setting_language}<a href="https://github.com/terreng/simple-web-server/issues/124" target="_blank" onclick="window.api.openExternal(this.href);event.preventDefault()" style="float: right;color: var(--link-primary);font-weight: 500;font-size: 17px;">{lang.help_us_translate}</a></div>
+                <div class="label">{lang.setting_language}<a href="https://github.com/terreng/simple-web-server/issues/200" target="_blank" onclick="window.api.openExternal(this.href);event.preventDefault()" style="float: right;color: var(--link-primary);font-weight: 500;font-size: 17px;">{lang.help_us_translate}</a></div>
                 <select id="language" oninput="changeLang()" aria-label="{lang.setting_language}"></select>
             </div>
 
@@ -100,7 +99,7 @@
                 <div style="
                     text-align: center;
                     padding-bottom: 10px;
-                ">{lang.version} 1.2.9&nbsp; • &nbsp;<a href="javascript:openLicenses()" style="
+                ">{lang.version} <span id="version_number"></span>&nbsp; • &nbsp;<a href="javascript:openLicenses()" style="
                     color: var(--text-primary);
                     text-decoration: none;
                 ">MIT License</a></div>
@@ -372,12 +371,12 @@
 
                 <div class="input_option">
                     <div class="label">{lang.option_httpsCert} <a href="#" class="help_icon" aria-label="{lang.help}" onclick="helpInfo(event, 'httpsCert', 'option')"><i class="material-icons" aria-hidden="true">help_outline</i></a></div>
-                    <input type="text" id="httpsCert" placeholder="" aria-label="{lang.option_httpsCert}">
+                    <textarea id="httpsCert" placeholder="" aria-label="{lang.option_httpsCert}"></textarea>
                 </div>
 
                 <div class="input_option">
                     <div class="label">{lang.option_httpsKey} <a href="#" class="help_icon" aria-label="{lang.help}" onclick="helpInfo(event, 'httpsKey', 'option')"><i class="material-icons" aria-hidden="true">help_outline</i></a></div>
-                    <input type="text" id="httpsKey" placeholder="" aria-label="{lang.option_httpsKey}">
+                    <textarea id="httpsKey" placeholder="" aria-label="{lang.option_httpsKey}"></textarea>
                 </div>
 
                 <div style="padding: 8px 12px;overflow: hidden;">
@@ -494,23 +493,6 @@
 
         <div id="drop_zone"></div>
 
-        <script>
-            var language = navigator.userAgent.split("language:")[1];
-
-            if (lang[language] && Object.keys(lang[language])) {
-                for (var i = 0; i < Object.keys(lang[language]).length; i++) {
-                    lang["en"][Object.keys(lang[language])[i]] = lang[language][Object.keys(lang[language])[i]];
-                }
-            }
-            lang = lang["en"];
-
-            document.body.innerHTML = document.body.innerHTML.replace(/{lang\.([\w.]+?)}/g, function(match) {if (!lang[match.substring(6, match.length-1)]) {console.warn("Couldn't find lang string: "+match.substring(6, match.length-1))}; return lang[match.substring(6, match.length-1)]});
-
-            document.getElementById("language").innerHTML = Array.from(Object.entries(languages)).map(function(a) {return '<option value="'+a[0]+'">'+a[1]+'</option>'}).join("");
-            document.getElementById("language").value = language;
-
-            document.documentElement.setAttribute("lang", language);
-        </script>
         <script src="main.js"></script>
     </body>
 </html>
