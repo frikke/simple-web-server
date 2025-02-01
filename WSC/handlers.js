@@ -40,6 +40,14 @@ class DirectoryEntryHandler {
         }
     }
     error(msg, httpCode) {
+        if (this.opts.spa && httpCode === 404 && this.request.path !== (this.opts.rewriteTo || "/index.html")) {
+            let newPath = (this.opts.rewriteTo || "/index.html");
+            this.request.path = newPath;
+            this.request.origpath = newPath;
+            this.request.uri = newPath;
+            this.fs.getByPath((this.opts.rewriteTo || "/index.html"), this.onEntry.bind(this));
+            return;
+        }
         const defaultMsg = '<h1>' + httpCode + ' - ' + WSC.HTTPRESPONSES[httpCode] + '</h1>\n\n<p>' + msg + '</p>';
         if (httpCode === 401) {
             this.setHeader("WWW-Authenticate", "Basic realm=\"SimpleWebServer\", charset=\"UTF-8\"");
@@ -95,22 +103,11 @@ class DirectoryEntryHandler {
             console.assert(typeof this.responseLength === 'number');
             this.res.setHeader('content-length', this.responseLength);
         }
-        const p = this.request.path.split('.');
-        if (p.length > 1 && ! this.responseHeaders['content-type']) {
-            const ext = p[p.length-1].toLowerCase();
+        if (!this.responseHeaders['content-type']) {
+            const ext = this.request.path.split('.').pop().toLowerCase();
             let type = WSC.MIMETYPES[ext];
             if (type) {
-                const default_types = ['text/html',
-                                       'text/xml',
-                                       'text/plain',
-                                       "text/vnd.wap.wml",
-                                       "application/javascript",
-                                       "application/rss+xml"]
-
-                if (default_types.includes(type)) {
-                    type += '; charset=utf-8';
-                }
-                this.setHeader('content-type',type);
+                this.contentType(type);
             }
         }
         if (this.opts.cors) {
@@ -175,10 +172,6 @@ class DirectoryEntryHandler {
                 this.error("", 401);
                 return;
             }
-        }
-
-        if (this.opts.spa && !this.request.uri.match(/.*\.[\d\w]+$/)) {
-            this.rewrite_to = this.opts.rewriteTo || "/index.html";
         }
 
         if (this[this.request.method.toLowerCase()]) {
@@ -508,11 +501,7 @@ class DirectoryEntryHandler {
                 return;
             }
         }
-        if (this.rewrite_to) {
-            this.fs.getByPath(this.rewrite_to, this.onEntry.bind(this));
-        } else {
-            this.fs.getByPath(this.request.path, this.onEntry.bind(this));
-        }
+        this.fs.getByPath(this.request.path, this.onEntry.bind(this));
     }
     onEntryMain() {
         if (this.opts.excludeDotHtml && this.request.path !== '' && ! this.request.origpath.endsWith("/")) {
@@ -543,13 +532,55 @@ class DirectoryEntryHandler {
             this.finish();
             return;
         }
+        if (this.opts.precompression !== false) {
+            const ac = this.request.headers['accept-encoding'];
+            let preCompressed = false;
+            let requestPathSplit = this.request.path.split(".");
+            let ext = this.request.path.split('.').pop().toLowerCase();
+            if (requestPathSplit.length > 2) {
+                let lastExt = requestPathSplit.pop();
+                let mainExt = requestPathSplit.pop();
+                let has2Extensions = WSC.MIMETYPES[mainExt];
+                if (has2Extensions && ac && ac.includes('gzip') && lastExt === "gz") {
+                    this.setHeader('Content-Encoding', 'gzip');
+                    preCompressed = true;
+                    ext = mainExt;
+                } else if (has2Extensions && ac && ac.includes('br') && lastExt === "br") {
+                    this.setHeader('Content-Encoding', 'br');
+                    preCompressed = true;
+                    ext = mainExt;
+                }
+            }
+            if (ac && ac.includes('gzip') && !preCompressed) {
+                let file = this.fs.getByPath(this.request.path+".gz");
+                if (file && !file.error) {
+                    this.setHeader('Content-Encoding', 'gzip');
+                    this.entry = file;
+                    preCompressed = true;
+                }
+            }
+            if (ac && ac.includes('br') && !preCompressed) {
+                let file = this.fs.getByPath(this.request.path+".br");
+                if (file && !file.error) {
+                    this.setHeader('Content-Encoding', 'br');
+                    this.entry = file;
+                    preCompressed = true;
+                }
+            }
+            if (preCompressed) {
+                let type = WSC.MIMETYPES[ext];
+                if (type) {
+                    this.contentType(type);
+                }
+            }
+        }
         if (!this.entry) {
             this.error('No Entry',404);
         } else if (this.entry.error) {
             if (this.entry.error.code === 'EPERM') {
                 this.error('', 403);
             } else {
-                this.error('Entry Not Found: ' + (this.rewrite_to || this.request.path).htmlEscape(), 404);
+                this.error('Entry Not Found: ' + this.request.path.htmlEscape(), 404);
             }
         } else if (this.entry.isFile) {
             this.renderFileContents(this.entry);
@@ -783,30 +814,11 @@ class DirectoryEntryHandler {
         this.htaccessMain(filerequested);
     }
     renderFileContents(entry) {
-        if (!entry.path) {
+        if (!entry.path || entry.error) {
             this.error('', 404);
             return;
         }
         //Check to see if this entry file has compressed files we can serve
-        if (this.opts.precompression) {
-            let found = false;
-            const ac = this.request.headers['accept-encoding'];
-            if (ac.includes('gzip')) {
-                let file = this.fs.getByPath(entry.fullPath+".gz");
-                if (file && !file.error) {
-                    entry = file;
-                    this.setHeader('Content-Encoding', 'gzip');
-                    found = true;
-                }
-            }
-            if (ac.includes('br') && !found) {
-                let file = this.fs.getByPath(entry.fullPath+".br");
-                if (file && !file.error) {
-                    this.setHeader('Content-Encoding', 'br');
-                    entry = file;
-                }
-            }
-        }
         if (entry.hidden && !this.opts.hiddenDotFiles) {
             this.error('', 404);
             return;
@@ -824,19 +836,29 @@ class DirectoryEntryHandler {
                 this.finish();
                 return;
             }
-            let fileOffset, fileEndOffset, code;
+            let fileOffset,
+                fileEndOffset = entry.size - 1,
+                code;
             if (this.request.headers['range']) {
                 //console.log('range request')
                 const range = this.request.headers['range'].split('=')[1].trim();
                 const rparts = range.split('-');
                 fileOffset = parseInt(rparts[0]);
                 if (! rparts[1]) {
-                    fileEndOffset = entry.size - 1;
+                    if (fileOffset > fileEndOffset) {
+                        fileOffset = fileEndOffset;
+                    }
                     this.responseLength = entry.size-fileOffset;
                     this.setHeader('content-range','bytes '+fileOffset+'-'+(entry.size-1)+'/'+entry.size);
                     code = (fileOffset === 0) ? 200 : 206;
                 } else {
-                    fileEndOffset = parseInt(rparts[1])
+                    const newFileEndOffset = parseInt(rparts[1]);
+                    if (newFileEndOffset < fileEndOffset) {
+                        fileEndOffset = newFileEndOffset;
+                    }
+                    if (fileOffset > fileEndOffset) {
+                        fileOffset = fileEndOffset;
+                    }
                     this.responseLength = fileEndOffset - fileOffset + 1;
                     this.setHeader('content-range','bytes '+fileOffset+'-'+(fileEndOffset)+'/'+entry.size);
                     code = 206;

@@ -1,10 +1,9 @@
-const version = 1002009;
-const install_source = "website"; //"website" | "microsoftstore" | "macappstore"
+const install_source = process.mas ? "macappstore" : (process.windowsStore ? "microsoftstore" : "website");
 const {app, BrowserWindow, ipcMain, Menu, Tray, dialog, shell, nativeTheme} = require('electron');
-const {networkInterfaces} = require('os');
+const os = require('os');
 var chokidar;
 if (!process.mas) {chokidar = require('chokidar')}
-global.hostOS = require('os').platform();
+global.hostOS = os.platform();
 global.eApp = app;
 global.tray = undefined;
 
@@ -19,7 +18,6 @@ global.forge = require('node-forge');
 global.fs = require('fs');
 global.path = require('path');
 global.atob = require("atob");
-global.Blob = require('node-blob');
 global.zlib = require('zlib');
 global.pipeline = require('stream').pipeline;
 
@@ -27,7 +25,41 @@ global.bookmarks = require('./bookmarks.js');
 global.plugin = require('./plugin.js');
 global.WSC = require("./WSC.js");
 
-require("./lang.js");
+const languages = {
+    "en": "English",
+    "zh_CN": "简体中文",
+    "zh_TW": "繁體中文",
+    "es": "Español",
+    "fr_FR": "Français",
+    "pt_PT": "Português",
+    "ru": "Русский",
+    "de": "Deutsch",
+    "ja": "日本語",
+    "ko": "한국어",
+    "it_IT": "Italiano",
+    "uk": "Українська",
+    "az": "Azərbaycanca",
+    "nl": "Nederlands",
+    "sv": "Svenska",
+}
+
+const language_filenames = {
+    "en": "en",
+    "zh_CN": "zh",
+    "zh_TW": "zh-Hant",
+    "es": "es",
+    "fr_FR": "fr",
+    "pt_PT": "pt",
+    "ru": "ru",
+    "de": "de",
+    "ja": "ja",
+    "ko": "ko",
+    "it_IT": "it",
+    "uk": "uk",
+    "az": "az",
+    "nl": "nl",
+    "sv": "sv",
+}
 
 console = function(old_console) {
     let new_console = {
@@ -116,14 +148,22 @@ const quit = function(event) {
 };
 
 function getIPs() {
-    const ifaces = networkInterfaces();
+    const hostname = os.hostname();
+    let non_lan = ["127.0.0.1", "::1"];
+    if (hostname && process.platform === "darwin") {
+        non_lan.push(hostname);
+    }
+    const ifaces = os.networkInterfaces();
     let ips = []
     for (const k in ifaces) {
         for (let i=0; i<ifaces[k].length; i++) {
             if (!ifaces[k][i].address.startsWith('fe80::') && ['IPv4', 'IPv6'].includes(ifaces[k][i].family)) {
-                ips.push([ifaces[k][i].address, ifaces[k][i].family.toLowerCase()])
+                ips.push([ifaces[k][i].address, ifaces[k][i].family.toLowerCase(), non_lan.includes(ifaces[k][i].address) ? false : true])
             }
         }
+    }
+    if (hostname && (process.platform === "darwin" || process.platform === "win32")) {
+        ips.push([hostname, "ipv4", non_lan.includes(hostname) ? false : true]);
     }
     return ips;
 }
@@ -335,7 +375,7 @@ ipcMain.on('saveconfig', function(event, arg1) {
     }
 
     if (arg1.reload && mainWindow) {
-        mainWindow.webContents.setUserAgent(mainWindow.webContents.getUserAgent().split(" language:")[0] + " language:" + getLanguage());
+        // mainWindow.webContents.setUserAgent(mainWindow.webContents.getUserAgent().split(" language:")[0] + " language:" + getLanguage());
         mainWindow.reload();
     }
 })
@@ -429,33 +469,38 @@ setInterval(function() {
 }, 10000) //every 10 seconds
 
 function getLanguage() {
-    var language = "en";
+    let language = "en";
 
     if (config.language && Object.keys(languages).indexOf(config.language) > -1) {
         language = config.language;
     } else {
-        var system_langs = app.getPreferredSystemLanguages();
-        for (var i = 0; i < system_langs.length; i++) {
-            if (system_langs[i].indexOf("en") == 0) {
-                language = "en";
-                break;
-            }
-            if (system_langs[i].indexOf("ru") == 0) {
-                language = "ru";
-                break;
-            }
-            if (system_langs[i].indexOf("zh") == 0) {
-                language = "zh_CN";
-                break;
-            }
-            if (system_langs[i].indexOf("ja") == 0) {
-                language = "ja";
-                break;
+        let system_langs = app.getPreferredSystemLanguages();
+        for (let i = 0; i < system_langs.length; i++) {
+            for (let e = 0; e < Object.keys(languages).length; e++) {
+                if (system_langs[i].indexOf(Object.keys(languages)[e].split("_")[0]) == 0) {
+                    language = Object.keys(languages)[e];
+                    return language;
+                }
             }
         }
     }
 
     return language;
+}
+
+function getLang() {
+    if (getLanguage() !== "en") {
+        let lang_target_src = JSON.parse(fs.readFileSync(path.join(__dirname, "lang/"+language_filenames[getLanguage()]+".json"), "utf-8"));   
+        let lang_to_return = JSON.parse(fs.readFileSync(path.join(__dirname, "lang/en.json"), "utf-8"));
+        
+        for (var i = 0; i < Object.keys(lang_target_src).length; i++) {
+            lang_to_return[Object.keys(lang_target_src)[i]] = lang_target_src[Object.keys(lang_target_src)[i]];
+        }
+        
+        return lang_to_return;
+    } else {
+        return JSON.parse(fs.readFileSync(path.join(__dirname, "lang/en.json"), "utf-8"));
+    }
 }
 
 function createWindow() {
@@ -480,7 +525,7 @@ function createWindow() {
     });
     mainWindow.setMenuBarVisibility(false);
 
-    mainWindow.webContents.setUserAgent(mainWindow.webContents.getUserAgent() + " language:" + getLanguage());
+    // mainWindow.webContents.setUserAgent(mainWindow.webContents.getUserAgent() + " language:" + getLanguage());
 
     mainWindow.loadFile('index.html');
 
@@ -489,7 +534,7 @@ function createWindow() {
     mainWindow.webContents.on('did-finish-load', () => {
         mainWindow.webContentsLoaded = true;
         lastIps = getIPs();
-        mainWindow.webContents.send('message', {"type": "init", "config": config, ip: lastIps, install_source: install_source, plugins: plugin.getInstalledPlugins(), platform: process.platform});
+        mainWindow.webContents.send('message', {"type": "init", "language": getLanguage(), "languages": languages, "lang": getLang(), "config": config, ip: lastIps, install_source: install_source, plugins: plugin.getInstalledPlugins(), platform: process.platform, version: app.getVersion()});
         if (update_info) {
             mainWindow.webContents.send('message', {"type": "update", "url": update_info.url, "text": update_info.text, "attributes": update_info.attributes, "version": update_info.version, "ignored": update_info.ignored});
         }
@@ -715,6 +760,13 @@ function checkForUpdates() {
         return;
     }
     last_update_check_skipped = false;
+
+    const parts = app.getVersion().split('.').map(part => parseInt(part, 10));
+    const major = parts[0] * 1000000;
+    const minor = parts[1] * 1000;
+    const patch = parts[2];
+    let version = major + minor + patch;
+
     let req = global.https.request({
         hostname: 'simplewebserver.org',
         port: 443,

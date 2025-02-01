@@ -1,6 +1,34 @@
 {
     "latest": "1002009",
     "versions": {
+        "1002016": {
+            "name": "1.2.16",
+            "download": {"website": "https://simplewebserver.org/download", "microsoftstore": "https://apps.microsoft.com/store/detail/simple-web-server/9PC6682RJCDD", "macappstore": "https://apps.apple.com/us/app/simple-web-server/id1625925255"}
+        },
+        "1002015": {
+            "name": "1.2.15",
+            "download": {"website": "https://simplewebserver.org/download", "microsoftstore": "https://apps.microsoft.com/store/detail/simple-web-server/9PC6682RJCDD", "macappstore": "https://apps.apple.com/us/app/simple-web-server/id1625925255"}
+        },
+        "1002014": {
+            "name": "1.2.14",
+            "download": {"website": "https://simplewebserver.org/download", "microsoftstore": "https://apps.microsoft.com/store/detail/simple-web-server/9PC6682RJCDD", "macappstore": "https://apps.apple.com/us/app/simple-web-server/id1625925255"}
+        },
+        "1002013": {
+            "name": "1.2.13",
+            "download": {"website": "https://simplewebserver.org/download", "microsoftstore": "https://apps.microsoft.com/store/detail/simple-web-server/9PC6682RJCDD", "macappstore": "https://apps.apple.com/us/app/simple-web-server/id1625925255"}
+        },
+        "1002012": {
+            "name": "1.2.12",
+            "download": {"website": "https://simplewebserver.org/download", "microsoftstore": "https://apps.microsoft.com/store/detail/simple-web-server/9PC6682RJCDD", "macappstore": "https://apps.apple.com/us/app/simple-web-server/id1625925255"}
+        },
+        "1002011": {
+            "name": "1.2.11",
+            "download": {"website": "https://simplewebserver.org/download", "microsoftstore": "https://apps.microsoft.com/store/detail/simple-web-server/9PC6682RJCDD", "macappstore": "https://apps.apple.com/us/app/simple-web-server/id1625925255"}
+        },
+        "1002010": {
+            "name": "1.2.10",
+            "download": {"website": "https://simplewebserver.org/download", "microsoftstore": "https://apps.microsoft.com/store/detail/simple-web-server/9PC6682RJCDD", "macappstore": "https://apps.apple.com/us/app/simple-web-server/id1625925255"}
+        },
         "1002009": {
             "name": "1.2.9",
             "download": {"website": "https://simplewebserver.org/download", "microsoftstore": "https://apps.microsoft.com/store/detail/simple-web-server/9PC6682RJCDD", "macappstore": "https://apps.apple.com/us/app/simple-web-server/id1625925255"}

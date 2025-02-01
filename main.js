@@ -1,45 +1,62 @@
 let config = {};
 let ip;
 let server_states = [];
-let running_states = {
-    "stopped": {
-        "text": lang.state_stopped,
-        "list_color": "var(--status-gray)",
-        "edit_color": "var(--text-primary)"
-    },
-    "starting": {
-        "text": lang.state_starting,
-        "list_color": "var(--status-gray)",
-        "edit_color": "var(--text-primary)"
-    },
-    "running": {
-        "text":  lang.state_running,
-        "list_color": "var(--status-green)",
-        "edit_color": "var(--status-green)"
-    },
-    "error": {
-        "text": lang.state_error,
-        "list_color": "var(--status-red)",
-        "edit_color": "var(--status-red)"
-    },
-    "unknown": {
-        "text": lang.state_starting,
-        "list_color": "var(--status-gray)",
-        "edit_color": "var(--text-primary)"
-    },
-}
+let running_states = {};
 let install_source;
 let plugins;
 let platform;
 let ignore_update;
+let lang;
+let languages;
+var language;
 
 window.api.initipc((event, message) => {
     if (message.type === "init") {
+        lang = message.lang;
+        languages = message.languages;
+        language = message.language;
+
+        document.body.innerHTML = document.body.innerHTML.replace(/{lang\.([\w.]+?)}/g, function(match) {if (!lang[match.substring(6, match.length-1)]) {console.warn("Couldn't find lang string: "+match.substring(6, match.length-1))}; return lang[match.substring(6, match.length-1)]});
+
+        document.getElementById("language").innerHTML = Array.from(Object.entries(languages)).map(function(a) {return '<option value="'+a[0]+'">'+a[1]+'</option>'}).join("");
+        document.getElementById("language").value = language;
+
+        document.documentElement.setAttribute("lang", language);
+
+        running_states = {
+            "stopped": {
+                "text": lang.state_stopped,
+                "list_color": "var(--status-gray)",
+                "edit_color": "var(--text-primary)"
+            },
+            "starting": {
+                "text": lang.state_starting,
+                "list_color": "var(--status-gray)",
+                "edit_color": "var(--text-primary)"
+            },
+            "running": {
+                "text":  lang.state_running,
+                "list_color": "var(--status-green)",
+                "edit_color": "var(--status-green)"
+            },
+            "error": {
+                "text": lang.state_error,
+                "list_color": "var(--status-red)",
+                "edit_color": "var(--status-red)"
+            },
+            "unknown": {
+                "text": lang.state_starting,
+                "list_color": "var(--status-gray)",
+                "edit_color": "var(--text-primary)"
+            },
+        }
+
         config = message.config;
         ip = message.ip;
         install_source = message.install_source;
         plugins = message.plugins;
         platform = message.platform;
+        document.getElementById("version_number").innerText = message.version;
         if (config.background != null && config.updates != null) openMain();
         else initWelcome();
         document.getElementById("stop_and_quit_button").style.display = config.background ? "block" : "none";
@@ -260,7 +277,7 @@ function getServerStatusBox(local_config) {
         let url_list = [];
 
         for (let i=0; i<ip.length; i++) {
-            if ((ip[i][0] === '127.0.0.1' && local_config.ipv6 !== true) || (ip[i][0] === '::1' && local_config.ipv6 === true) || (local_config.localnetwork && ((ip[i][1] === "ipv4") || (ip[i][1] === "ipv6" && local_config.ipv6 === true)))) {
+            if ((ip[i][1] == "ipv4" && ip[i][2] === false) || (ip[i][1] == "ipv6" && local_config.ipv6 === true && ip[i][2] === false) || (local_config.localnetwork && ((ip[i][1] === "ipv4") || (ip[i][1] === "ipv6" && local_config.ipv6 === true)))) {
                 url_list.push((local_config.https ? 'https' : 'http')+'://'+(ip[i][1] === "ipv6" ? "["+ip[i][0]+"]" : ip[i][0])+':'+local_config.port);
             }
         }
@@ -272,7 +289,11 @@ function getServerStatusBox(local_config) {
         if (error_message.indexOf("EADDRINUSE") > -1) {
             return '<div class="status_box error_status_box"><div>'+lang.error_port_in_use+'</div><div>'+lang.error_port_in_use_description.replace("[PORT]", local_config.port)+'</div></div>';
         } else if (error_message.indexOf("FILESYSTEMERROR-") == 0) {
-            return '<div class="status_box error_status_box"><div>'+lang.error_file_system+'</div><div>'+htmlescape(error_message.substring("FILESYSTEMERROR-".length))+'</div></div>';
+            if (error_message.indexOf("bookmarkDataIsStale") > -1) {
+                return '<div class="status_box error_status_box"><div>'+lang.error_mas_stale_bookmarks_title+'</div><div>'+lang.error_mas_stale_bookmarks_description+'</div></div>';
+            } else {
+                return '<div class="status_box error_status_box"><div>'+lang.error_file_system+'</div><div>'+htmlescape(error_message.substring("FILESYSTEMERROR-".length))+'</div></div>';
+            }
         } else if (error_message.indexOf("PLUGINERROR-") == 0) {
             return '<div class="status_box error_status_box"><div>'+lang.error_plugins+'</div><div>'+htmlescape(error_message.substring("PLUGINERROR-".length))+'</div></div>';
         } else {
@@ -393,7 +414,7 @@ function addServer(editindex) {
         toggleCheckbox("delete", config.servers[editindex].delete != null ? config.servers[editindex].delete : false);
         toggleCheckbox("staticDirectoryListing", config.servers[editindex].staticDirectoryListing != null ? config.servers[editindex].staticDirectoryListing : false);
         toggleCheckbox("hiddenDotFilesDirectoryListing", config.servers[editindex].hiddenDotFilesDirectoryListing != null ? config.servers[editindex].hiddenDotFilesDirectoryListing : true);
-        toggleCheckbox("precompression", config.servers[editindex].precompression != null ? config.servers[editindex].precompression : false);
+        toggleCheckbox("precompression", config.servers[editindex].precompression != null ? config.servers[editindex].precompression : true);
         toggleCheckbox("htaccess", config.servers[editindex].htaccess != null ? config.servers[editindex].htaccess : false);
 
         document.querySelector("#custom404").value = config.servers[editindex].custom404 || "";
@@ -402,8 +423,8 @@ function addServer(editindex) {
         document.querySelector("#customErrorReplaceString").value = config.servers[editindex].customErrorReplaceString || "";
 
         toggleCheckbox("https", config.servers[editindex].https != null ? config.servers[editindex].https : false);
-        document.querySelector("#httpsCert").value = config.servers[editindex].httpsCert ? config.servers[editindex].httpsCert.split("\r").join("\\r").split("\n").join("\\n") : "";
-        document.querySelector("#httpsKey").value = config.servers[editindex].httpsKey ? config.servers[editindex].httpsKey.split("\r").join("\\r").split("\n").join("\\n") : "";
+        document.querySelector("#httpsCert").value = config.servers[editindex].httpsCert ? config.servers[editindex].httpsCert : "";
+        document.querySelector("#httpsKey").value = config.servers[editindex].httpsKey ? config.servers[editindex].httpsKey : "";
         toggleCheckbox("httpAuth", config.servers[editindex].httpAuth != null ? config.servers[editindex].httpAuth : false);
         document.querySelector("#httpAuthUsername").value = config.servers[editindex].httpAuthUsername || "";
         httpAuthUsernameChange();
@@ -445,7 +466,7 @@ function addServer(editindex) {
         toggleCheckbox("delete", false);
         toggleCheckbox("staticDirectoryListing", false);
         toggleCheckbox("hiddenDotFilesDirectoryListing", true);
-        toggleCheckbox("precompression", false);
+        toggleCheckbox("precompression", true);
         toggleCheckbox("htaccess", false);
 
         document.querySelector("#custom404").value = "";
@@ -561,8 +582,8 @@ function submitAddServer() {
         "customErrorReplaceString": document.querySelector("#customErrorReplaceString").value,
 
         "https": isChecked("https"),
-        "httpsCert": document.querySelector("#httpsCert").value.split("\\r").join("\r").split("\\n").join("\n"),
-        "httpsKey": document.querySelector("#httpsKey").value.split("\\r").join("\r").split("\\n").join("\n"),
+        "httpsCert": document.querySelector("#httpsCert").value.replace(/\r?\n/g, a => '\r\n'),
+        "httpsKey": document.querySelector("#httpsKey").value.replace(/\r?\n/g, a => '\r\n'),
         "httpAuth": isChecked("httpAuth"),
         "httpAuthUsername": document.querySelector("#httpAuthUsername").value,
         "httpAuthPassword": document.querySelector("#httpAuthPassword").value,
@@ -897,15 +918,15 @@ function generateCrypto() {
             document.getElementById("generate_crypto").classList.remove("disabled");
             if (document.getElementById("httpsCert").value.length > 0 || document.getElementById("httpsKey").value.length > 0) {
                 showPrompt(lang.generate_crypto_overwrite, lang.generate_crypto_overwrite_description, [[lang.prompt_confirm,"destructive",function() {
-                    document.getElementById("httpsCert").value = crypto.cert.split("\r").join("\\r").split("\n").join("\\n");
-                    document.getElementById("httpsKey").value = crypto.privateKey.split("\r").join("\\r").split("\n").join("\\n");
+                    document.getElementById("httpsCert").value = crypto.cert;
+                    document.getElementById("httpsKey").value = crypto.privateKey;
                     hidePrompt();
                 }],[lang.cancel,"",function() {hidePrompt()}]])
             } else {
                 console.log(crypto.cert);
                 console.log(crypto.privateKey);
-                document.getElementById("httpsCert").value = crypto.cert.split("\r").join("\\r").split("\n").join("\\n");
-                document.getElementById("httpsKey").value = crypto.privateKey.split("\r").join("\\r").split("\n").join("\\n");
+                document.getElementById("httpsCert").value = crypto.cert;
+                document.getElementById("httpsKey").value = crypto.privateKey;
             }
         }
     });
@@ -1009,7 +1030,7 @@ function addPlugin(select_type) {
 }
 
 window.addEventListener("keypress", function(event) {
-    if (event.key === "Enter") {
+    if (event.key === "Enter" && event.target.tagName !== "TEXTAREA") {
         event.preventDefault();
         document.activeElement.click();
     }
@@ -1073,7 +1094,7 @@ function renderPluginOptions(server_config) {
         let manifest = plugins[Object.keys(plugins)[i]];
         let plugin_options = (server_config && server_config.plugins && server_config.plugins[manifest.id]) ? server_config.plugins[manifest.id] : {};
 
-        pendhtml += '<div tabindex="0" class="settings_section_header plugin_section'+(plugin_options.enabled ? " plugin_enabled" : "")+((manifest.options && manifest.options.length > 0) ? "" : " plugin_nooptions")+'" onclick="toggleSection(this)" id="plugin.'+manifest.id+'" role="button" aria-label="'+urlescape(manifest.name)+'"><div role="checkbox" tabindex="0" aria-label="'+lang.enabled_switch+'" aria-checked="'+(plugin_options.enabled ? "true" : "false")+'" onclick="togglePlugin(event, this)"><i class="material-icons" aria-hidden="true">'+(plugin_options.enabled ? "check_box" : "check_box_outline_blank")+'</i></div><div>'+htmlescape(manifest.name)+'</div>'+((manifest.options && manifest.options.length > 0) ? '<div><i class="material-icons" aria-hidden="true">expand_more</i></div>' : '')+'</div><div class="settings_section" inert><div class="settings_section_inner"'+(plugin_options.enabled ? "" : " inert")+'>'+manifest.options.map(option => drawOption(manifest.id, option, plugin_options)).join("")+'</div></div>';
+        pendhtml += '<div tabindex="0" class="settings_section_header plugin_section'+(plugin_options.enabled ? " plugin_enabled" : "")+(((manifest.options || []).length > 0) ? "" : " plugin_nooptions")+'" onclick="toggleSection(this)" id="plugin.'+manifest.id+'" role="button" aria-label="'+urlescape(manifest.name)+'"><div role="checkbox" tabindex="0" aria-label="'+lang.enabled_switch+'" aria-checked="'+(plugin_options.enabled ? "true" : "false")+'" onclick="togglePlugin(event, this)"><i class="material-icons" aria-hidden="true">'+(plugin_options.enabled ? "check_box" : "check_box_outline_blank")+'</i></div><div>'+htmlescape(manifest.name)+'</div>'+(((manifest.options || []).length > 0) ? '<div><i class="material-icons" aria-hidden="true">expand_more</i></div>' : '')+'</div><div class="settings_section" inert><div class="settings_section_inner"'+(plugin_options.enabled ? "" : " inert")+'>'+(manifest.options || []).map(option => drawOption(manifest.id, option, plugin_options)).join("")+'</div></div>';
     }
 
     document.querySelector("#plugin_options").innerHTML = pendhtml;
@@ -1108,7 +1129,7 @@ function savePluginOptions() {
             "enabled": document.querySelector("#plugin\\."+manifest.id).classList.contains("plugin_enabled")
         }
 
-        for (let e=0; e<manifest.options.length; e++) {
+        for (let e=0; e<(manifest.options || []).length; e++) {
             let option = manifest.options[e];
             
             if (option.type == "bool") {
